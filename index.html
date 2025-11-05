@@ -20,11 +20,9 @@
         .list-item { transition: all 0.3s ease-in-out; }
     </style>
     <script type="module" defer>
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        
-        // 'setLogLevel' is now combined with the other firestore imports
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, serverTimestamp, Timestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, serverTimestamp, Timestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
         // --- 3. Firebase Configuration ---
         const firebaseConfig = {
@@ -40,11 +38,6 @@
         // Define appId for use in database paths
         const appId = firebaseConfig.appId;
         
-        // --- This is the conflicting block that has been REMOVED ---
-        // const app = initializeApp(firebaseConfig);
-        // const analytics = getAnalytics(app);
-        // -----------------------------------------------------------
-
         // Initialize Firebase
         let app, db, auth;
         let userId = null;
@@ -154,7 +147,8 @@
 
                 }, (error) => {
                     console.error("Snapshot Error:", error);
-                    showMessage("Error fetching live data. Check console.", "error");
+                    // This is where you would see a PERMISSION_DENIED error if rules are wrong
+                    showMessage("Error fetching live data. Check console (F12) for details.", "error");
                     loadingSpinner.classList.add('hidden');
                 });
             } catch (e) {
