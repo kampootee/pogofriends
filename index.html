@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Friend Code Hub</title>
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles */
+        body { font-family: 'Inter', sans-serif; }
+        /* Hide number input spinners */
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type='number'] { -moz-appearance: textfield; }
+        
+        /* Transition for list items */
+        .list-item { transition: all 0.3s ease-in-out; }
+    </style>
+    <!-- 2. Firebase Libraries -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 3. Firebase Configuration ---
+        // IMPORTANT: Replace with your project's config
+        // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAYay2cu9x-kCx37SLsHWfwhOikgHZOfqM",
+  authDomain: "pogofriends-a018d.firebaseapp.com",
+  projectId: "pogofriends-a018d",
+  storageBucket: "pogofriends-a018d.firebasestorage.app",
+  messagingSenderId: "746239293067",
+  appId: "1:746239293067:web:c560238a7df9b75f47068e",
+  measurementId: "G-XV6CNNHXK6"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+
+        // Initialize Firebase
+        let app, db, auth;
+        let userId = null;
+        let friendsList = []; // Local cache for the list
+        let currentSearchTerm = ''; // For filtering
+
+        // --- 4. Element References ---
+        const listContainer = document.getElementById('friend-list-container');
+        const form = document.getElementById('friend-input-form');
+        const usernameInput = document.getElementById('username');
+        const codeInput = document.getElementById('friend-code');
+        const colorInput = document.getElementById('list-color');
+        const submitButton = document.getElementById('submit-button');
+        const messageArea = document.getElementById('message-area');
+        const searchInput = document.getElementById('search-input');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const listWrapper = document.getElementById('list-wrapper');
+
+        // --- 5. Initialization ---
+        function initializeAppCore() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug'); // Enable Firestore logging
+
+                // Set auth persistence
+                setPersistence(auth, browserLocalPersistence)
+                    .then(() => {
+                        console.log("Persistence set to local.");
+                        setupAuthListener();
+                    })
+                    .catch((error) => {
+                        console.error("Error setting persistence: ", error);
+                        setupAuthListener(); // Continue anyway
+                    });
+
+            } catch (e) {
+                console.error("Firebase Initialization Error:", e);
+                showMessage("Error connecting to the service. Please refresh.", "error");
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+
+        // --- 6. Authentication ---
+        function setupAuthListener() {
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    console.log("User is signed in:", user.uid);
+                    userId = user.uid;
+                    // User is authenticated, now we can set up the real-time listener
+                    setupRealTimeListener();
+                } else {
+                    console.log("User is not signed in. Authenticating...");
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            console.log("Signing in with custom token...");
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            console.log("Signing in anonymously...");
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Authentication Error:", error);
+                        showMessage("Could not authenticate. Please refresh.", "error");
+                        loadingSpinner.classList.add('hidden');
+                    }
+                }
+            });
+        }
+
+        // --- 7. Real-Time Data Listener ---
+        function setupRealTimeListener() {
+            if (!userId) {
+                console.error("Listener setup failed: userId is null.");
+                // This function will be re-called by onAuthStateChanged when userId is set
+                return;
+            }
+
+            console.log("Setting up real-time listener...");
+            // Path for public data
+            const collectionPath = `artifacts/${appId}/public/data/friend-codes`;
+            const q = query(collection(db, collectionPath));
+
+            try {
+                onSnapshot(q, (snapshot) => {
+                    console.log("Received snapshot update. Documents count:", snapshot.size);
+                    friendsList = []; // Clear local cache
+                    snapshot.forEach((doc) => {
+                        friendsList.push({ id: doc.id, ...doc.data() });
+                    });
+
+                    // Sort by timestamp (newest first)
+                    friendsList.sort((a, b) => {
+                        const timeA = a.createdAt?.seconds || 0;
+                        const timeB = b.createdAt?.seconds || 0;
+                        return timeB - timeA; // Descending order
+                    });
+
+                    console.log("Local list updated:", friendsList);
+                    updateHtmlList(); // Re-render the list
+                    
+                    // Hide spinner and show list
+                    loadingSpinner.classList.add('hidden');
+                    listWrapper.classList.remove('hidden');
+
+                }, (error) => {
+                    console.error("Snapshot Error:", error);
+                    showMessage("Error fetching live data.", "error");
+                    loadingSpinner.classList.add('hidden');
+                });
+            } catch (e) {
+                console.error("Error setting up listener:", e);
+                showMessage("Critical error starting real-time service.", "error");
+            }
+        }
+
+        // --- 8. UI Rendering Function ---
+        function updateHtmlList() {
+            if (!listContainer) return;
+            listContainer.innerHTML = ''; // Clear current list
+
+            const colorMap = {
+                'red': 'bg-red-100 border-l-4 border-red-500',
+                'blue': 'bg-blue-100 border-l-4 border-blue-500',
+                'yellow': 'bg-yellow-100 border-l-4 border-yellow-500',
+            };
+            
+            // --- FILTER LOGIC ---
+            let filteredList = friendsList;
+            if (currentSearchTerm) {
+                filteredList = friendsList.filter(friend => 
+                    friend.name.toLowerCase().includes(currentSearchTerm)
+                );
+            }
+            // --- END FILTER LOGIC ---
+
+            if (filteredList.length === 0) {
+                const emptyItem = document.createElement('li');
+                emptyItem.className = 'py-4 text-center text-gray-400 italic';
+                if (currentSearchTerm) {
+                     emptyItem.textContent = `No user found matching "${currentSearchTerm}".`;
+                } else {
+                     emptyItem.textContent = 'No friend codes added yet. Be the first!';
+                }
+                listContainer.appendChild(emptyItem);
+                return;
+            }
+
+            filteredList.forEach((friend) => {
+                const listItem = document.createElement('li');
+                const colorClass = colorMap[friend.color] || 'bg-gray-100 border-l-4 border-gray-400';
+                listItem.className = `list-item py-3 px-4 flex justify-between items-center transition duration-150 rounded-lg shadow-sm mb-2 ${colorClass}`;
+
+                // --- MODIFIED: Grouping Username, Code, and Copy Button ---
+                const infoWrapper = document.createElement('div');
+                infoWrapper.className = 'flex flex-col sm:flex-row sm:items-center sm:space-x-4';
+
+                // Username
+                const nameElement = document.createElement('span');
+                nameElement.className = 'font-semibold text-gray-800 truncate';
+                nameElement.textContent = friend.name;
+
+                // Code + Copy Button Wrapper
+                const codeWrapper = document.createElement('div');
+                codeWrapper.className = 'flex items-center space-x-2 mt-1 sm:mt-0';
+
+                // The Code
+                const codeElement = document.createElement('span');
+                codeElement.className = 'text-gray-700 font-mono text-sm sm:text-base tracking-wider bg-white bg-opacity-70 px-3 py-1 rounded-md border border-gray-200';
+                codeElement.textContent = friend.code;
+
+                // Copy Button
+                const copyButton = document.createElement('button');
+                copyButton.className = 'p-1 rounded-md text-gray-400 hover:text-blue-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-150 flex-shrink-0';
+                copyButton.title = 'Copy code to clipboard';
+                
+                // SVG Icon (Copy)
+                const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`;
+                // SVG Icon (Check)
+                const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>`;
+
+                copyButton.innerHTML = copyIcon;
+                
+                copyButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    copyCodeToClipboard(friend.code, copyButton, copyIcon, checkIcon);
+                });
+                
+                // Assemble the parts
+                codeWrapper.appendChild(codeElement);
+                codeWrapper.appendChild(copyButton);
+                
+                infoWrapper.appendChild(nameElement);
+                infoWrapper.appendChild(codeWrapper);
+                
+                listItem.appendChild(infoWrapper);
+                // The copy button is now inside the infoWrapper, so no need to append it separately
+                
+                listContainer.appendChild(listItem);
+            });
+        }
+        
+        // --- 9. Form Handling ---
+        
+        // Input Filtering: Username (Alphanumeric only)
+        usernameInput.addEventListener('input', function() {
+            this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');
+        });
+
+        // Input Filtering: Friend Code (Digits + Hyphens)
+        codeInput.addEventListener('input', function(e) {
+            let val = this.value.replace(/[^\d]/g, ''); // Remove non-digits
+            if (val.length > 12) val = val.substring(0, 12); // Max 12 digits
+            
+            // Corrected Hyphen Logic
+            const chunks = val.match(/.{1,4}/g); // Split into chunks of 4
+            if (chunks) {
+                this.value = chunks.join('-'); // Join with hyphens
+            } else {
+                this.value = '';
+            }
+        });
+        
+        // Search Input Filtering
+        searchInput.addEventListener('input', function() {
+            currentSearchTerm = this.value.toLowerCase().trim();
+            updateHtmlList(); // Re-render the list on every keystroke
+        });
+
+        // Main Form Submission
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (!userId) {
+                showMessage("You are not connected. Please refresh.", "error");
+                return;
+            }
+
+            const username = usernameInput.value.trim();
+            const codeRaw = codeInput.value.replace(/-/g, ''); // Store raw digits
+            const color = colorInput.value;
+
+            // Validation
+            if (!username || !codeRaw || !color) {
+                showMessage("Please fill out all fields.", "error");
+                return;
+            }
+            if (codeRaw.length !== 12) {
+                showMessage("Friend Code must be exactly 12 digits.", "error");
+                return;
+            }
+
+            setFormDisabled(true); // Disable form
+            
+            try {
+                // --- Cooldown Check ---
+                // Private path for user metadata
+                const userMetaPath = `artifacts/${appId}/users/${userId}/friend-code-meta/submission`;
+                const userMetaDoc = doc(db, userMetaPath);
+                const docSnap = await getDoc(userMetaDoc);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const lastSubmitTime = data.lastSubmitted.toDate();
+                    const thirtyDaysAgo = new Date();
+                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+                    if (lastSubmitTime > thirtyDaysAgo) {
+                        const remaining = new Date(lastSubmitTime.getTime() + (30 * 24 * 60 * 60 * 1000));
+                        const daysLeft = Math.ceil((remaining - new Date()) / (1000 * 60 * 60 * 24));
+                        showMessage(`You can submit again in ${daysLeft} day(s).`, "info");
+                        setFormDisabled(false);
+                        return;
+                    }
+                }
+                
+                // --- Proceed with Submission ---
+                // Public data path
+                const collectionPath = `artifacts/${appId}/public/data/friend-codes`;
+                // Use the userId as the document ID to enforce one entry per user
+                const docRef = doc(db, collectionPath, userId); 
+
+                await setDoc(docRef, {
+                    name: username,
+                    code: codeRaw,
+                    color: color,
+                    createdAt: serverTimestamp(), // Firestore server time
+                    authorId: userId
+                });
+                
+                // Update private cooldown timestamp
+                await setDoc(userMetaDoc, {
+                    lastSubmitted: serverTimestamp()
+                });
+
+                showMessage("Success! Your code is on the list.", "success");
+                form.reset(); // Clear form fields
+                codeInput.value = ''; // Ensure formatted field is cleared
+                
+            } catch (error) {
+                console.error("Submission Error:", error);
+                showMessage("An error occurred. Please try again.", "error");
+            } finally {
+                setFormDisabled(false); // Re-enable form
+            }
+        });
+        
+        // --- 10. Helper Functions ---
+        
+        // Show Success/Error Messages
+        function showMessage(msg, type = "info") {
+            messageArea.textContent = msg;
+            messageArea.classList.remove('hidden', 'text-green-600', 'text-red-600', 'text-blue-600');
+
+            if (type === "success") {
+                messageArea.classList.add('text-green-600');
+            } else if (type === "error") {
+                messageArea.classList.add('text-red-600');
+            } else {
+                messageArea.classList.add('text-blue-600');
+            }
+            
+            // Hide message after 5 seconds
+            setTimeout(() => {
+                messageArea.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Disable/Enable Form
+        function setFormDisabled(isDisabled) {
+            submitButton.disabled = isDisabled;
+            usernameInput.disabled = isDisabled;
+            codeInput.disabled = isDisabled;
+            colorInput.disabled = isDisabled;
+            
+            if (isDisabled) {
+                submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                submitButton.textContent = 'Submitting...';
+            } else {
+                submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                submitButton.textContent = 'Add to List';
+            }
+        }
+        
+        // Copy to Clipboard
+        function copyCodeToClipboard(text, buttonEl, copyIcon, checkIcon) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed'; // Prevent screen jump
+            textarea.style.opacity = 0;
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                console.log('Code copied to clipboard:', text);
+                
+                // Visual feedback
+                buttonEl.innerHTML = checkIcon;
+                setTimeout(() => {
+                    buttonEl.innerHTML = copyIcon;
+                }, 1500);
+                
+            } catch (err) {
+                console.error('Failed to copy code:', err);
+                alert("Failed to copy. Please copy manually.");
+            }
+            
+            document.body.removeChild(textarea);
+        }
+
+        // --- 11. Start the App ---
+        initializeAppCore();
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-4 sm:p-8 gap-8">
+
+    <!-- Card 1: Submission Form -->
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-6 sm:p-10">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Live Friend Code Hub</h1>
+        </div>
+
+        <!-- Submission Form -->
+        <div class="pb-2">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-5">Add Your Code</h2>
+            <form id="friend-input-form" class="space-y-5">
+                
+                <!-- Username -->
+                <div class="flex flex-col sm:flex-row sm:items-center">
+                    <label for="username" class="sm:min-w-[120px] mb-1 sm:mb-0 block text-sm font-medium text-gray-700">Username:</label>
+                    <input type="text" id="username" name="username" 
+                           class="flex-grow px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-inner"
+                           maxlength="20"
+                           autocomplete="off"
+                           >
+                </div>
+
+                <!-- Friend Code -->
+                <div class="flex flex-col sm:flex-row sm:items-center">
+                    <label for="friend-code" class="sm:min-w-[120px] mb-1 sm:mb-0 block text-sm font-medium text-gray-700">Friend Code:</label>
+                    <input type="text" id="friend-code" name="friend-code" 
+                           class="flex-grow px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 font-mono shadow-inner"
+                           maxlength="14" 
+                           placeholder="0000-0000-0000"
+                           autocomplete="off"
+                           >
+                </div>
+                
+                <!-- List Color -->
+                <div class="flex flex-col sm:flex-row sm:items-center">
+                    <label for="list-color" class="sm:min-w-[120px] mb-1 sm:mb-0 block text-sm font-medium text-gray-700">List Color:</label>
+                    <select id="list-color" name="list-color" 
+                            class="flex-grow px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-inner appearance-none bg-white">
+                        <option value="red">Red</option>
+                        <option value="blue">Blue</option>
+                        <option valueD="yellow">Yellow</option>
+                    </select>
+                </div>
+
+                <!-- Submit Button -->
+                <div>
+                    <button type="submit" id="submit-button" 
+                            class="w-full font-semibold py-3 px-5 border border-transparent rounded-lg shadow-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                        Add to List
+                    </button>
+                </div>
+                
+                <!-- Message Area -->
+                <div id="message-area" class="text-center h-5 text-sm font-medium hidden"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Card 2: List Display -->
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-6 sm:p-10">
+        <div>
+            <h2 class="text-2xl font-semibold text-gray-700 mb-5">Friend Codes (Live List)</h2>
+            
+            <!-- Search Input -->
+            <div class="mb-4">
+                 <input type="text" id="search-input" placeholder="Search by Username..."
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-inner"
+                        autocomplete="off">
+            </div>
+            
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="text-center py-10">
+                <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path classs="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="mt-2 text-sm text-gray-500">Connecting to live list...</p>
+            </div>
+
+            <!-- List Container -->
+            <div id="list-wrapper" class="hidden">
+                <ul id="friend-list-container" class="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                    <!-- Live data will be injected here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+
