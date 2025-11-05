@@ -27,23 +27,25 @@
         import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- 3. Firebase Configuration ---
-        // IMPORTANT: Replace with your project's config
-        // Import the functions you need from the SDKs you need
-        
-import { initializeApp } from "firebase/app";
-        
-import { getAnalytics } from "firebase/analytics";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+      import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAYay2cu9x-kCx37SLsHWfwhOikgHZOfqM",
-  authDomain: "pogofriends-a018d.firebaseapp.com",
-  projectId: "pogofriends-a018d",
-  storageBucket: "pogofriends-a018d.firebasestorage.app",
-  messagingSenderId: "746239293067",
-  appId: "1:746239293067:web:c560238a7df9b75f47068e",
-  measurementId: "G-XV6CNNHXK6"
-};
+      // --- 3. Firebase Configuration ---
+      // ADD THIS CONFIG OBJECT BACK IN
+      const firebaseConfig = {
+        apiKey: "AIzaSyAYay2cu9x-kCx37SLsHWfwhOikgHZOfqM",
+        authDomain: "pogofriends-a018d.firebaseapp.com",
+        projectId: "pogofriends-a018d",
+        storageBucket: "pogofriends-a018d.firebasestorage.app",
+        messagingSenderId: "746239293067",
+        appId: "1:746239293067:web:c560238a7df9b75f47068e",
+        measurementId: "G-XV6CNNHXK6"
+      };
+
+      // Initialize Firebase
+      let app, db, auth;
+      let userId = null;
+
 
         // Initialize Firebase
         let app, db, auth;
@@ -463,7 +465,7 @@ const firebaseConfig = {
                             class="flex-grow px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-inner appearance-none bg-white">
                         <option value="red">Red</option>
                         <option value="blue">Blue</option>
-                        <option valueD="yellow">Yellow</option>
+                        <option value="yellow">Yellow</option>
                     </select>
                 </div>
 
@@ -513,5 +515,4 @@ const firebaseConfig = {
 
 </body>
 </html>
-
 
