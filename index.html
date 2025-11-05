@@ -6,9 +6,9 @@
     <title>Live Friend Code Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom styles */
+       
         body { font-family: 'Inter', sans-serif; }
-        /* Hide number input spinners */
+       
         input[type='number']::-webkit-inner-spin-button,
         input[type='number']::-webkit-outer-spin-button {
             -webkit-appearance: none;
@@ -16,7 +16,7 @@
         }
         input[type='number'] { -moz-appearance: textfield; }
         
-        /* Transition for list items */
+        
         .list-item { transition: all 0.3s ease-in-out; }
     </style>
     <script type="module" defer>
@@ -24,8 +24,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, serverTimestamp, Timestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
-        // --- 3. Firebase Configuration ---
-        const firebaseConfig = {
+          const firebaseConfig = {
           apiKey: "AIzaSyAYay2cu9x-kCx37SLsHWfwhOikgHZOfqM",
           authDomain: "pogofriends-a018d.firebaseapp.com",
           projectId: "pogofriends-a018d",
@@ -35,16 +34,16 @@
           measurementId: "G-XV6CNNHXK6"
         };
         
-        // Define appId for use in database paths
+        
         const appId = firebaseConfig.appId;
         
-        // Initialize Firebase
+        
         let app, db, auth;
         let userId = null;
         let friendsList = []; // Local cache for the list
         let currentSearchTerm = ''; // For filtering
 
-        // --- 4. Element References ---
+        
         const listContainer = document.getElementById('friend-list-container');
         const form = document.getElementById('friend-input-form');
         const usernameInput = document.getElementById('username');
@@ -56,7 +55,7 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const listWrapper = document.getElementById('list-wrapper');
 
-        // --- 5. Initialization ---
+        
         function initializeAppCore() {
             try {
                 // The app is initialized HERE
@@ -83,7 +82,7 @@
             }
         }
 
-        // --- 6. Authentication ---
+        
         function setupAuthListener() {
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
@@ -110,11 +109,11 @@
             });
         }
 
-        // --- 7. Real-Time Data Listener ---
+        
         function setupRealTimeListener() {
             if (!userId) {
                 console.error("Listener setup failed: userId is null.");
-                // This function will be re-called by onAuthStateChanged when userId is set
+                
                 return;
             }
 
@@ -131,7 +130,7 @@
                         friendsList.push({ id: doc.id, ...doc.data() });
                     });
 
-                    // Sort by timestamp (newest first)
+                    
                     friendsList.sort((a, b) => {
                         const timeA = a.createdAt?.seconds || 0;
                         const timeB = b.createdAt?.seconds || 0;
@@ -141,13 +140,13 @@
                     console.log("Local list updated:", friendsList);
                     updateHtmlList(); // Re-render the list
                     
-                    // Hide spinner and show list
+                    
                     loadingSpinner.classList.add('hidden');
                     listWrapper.classList.remove('hidden');
 
                 }, (error) => {
                     console.error("Snapshot Error:", error);
-                    // This is where you would see a PERMISSION_DENIED error if rules are wrong
+                    
                     showMessage("Error fetching live data. Check console (F12) for details.", "error");
                     loadingSpinner.classList.add('hidden');
                 });
@@ -157,7 +156,7 @@
             }
         }
 
-        // --- 8. UI Rendering Function ---
+        
         function updateHtmlList() {
             if (!listContainer) return;
             listContainer.innerHTML = ''; // Clear current list
@@ -168,14 +167,14 @@
                 'yellow': 'bg-yellow-100 border-l-4 border-yellow-500',
             };
             
-            // --- FILTER LOGIC ---
+            
             let filteredList = friendsList;
             if (currentSearchTerm) {
                 filteredList = friendsList.filter(friend => 
                     friend.name.toLowerCase().includes(currentSearchTerm)
                 );
             }
-            // --- END FILTER LOGIC ---
+            
 
             if (filteredList.length === 0) {
                 const emptyItem = document.createElement('li');
@@ -194,32 +193,32 @@
                 const colorClass = colorMap[friend.color] || 'bg-gray-100 border-l-4 border-gray-400';
                 listItem.className = `list-item py-3 px-4 flex justify-between items-center transition duration-150 rounded-lg shadow-sm mb-2 ${colorClass}`;
 
-                // --- MODIFIED: Grouping Username, Code, and Copy Button ---
+                
                 const infoWrapper = document.createElement('div');
                 infoWrapper.className = 'flex flex-col sm:flex-row sm:items-center sm:space-x-4';
 
-                // Username
+                
                 const nameElement = document.createElement('span');
                 nameElement.className = 'font-semibold text-gray-800 truncate';
                 nameElement.textContent = friend.name;
 
-                // Code + Copy Button Wrapper
+                
                 const codeWrapper = document.createElement('div');
                 codeWrapper.className = 'flex items-center space-x-2 mt-1 sm:mt-0';
 
-                // The Code
+                
                 const codeElement = document.createElement('span');
                 codeElement.className = 'text-gray-700 font-mono text-sm sm:text-base tracking-wider bg-white bg-opacity-70 px-3 py-1 rounded-md border border-gray-200';
                 codeElement.textContent = friend.code;
 
-                // Copy Button
+                
                 const copyButton = document.createElement('button');
                 copyButton.className = 'p-1 rounded-md text-gray-400 hover:text-blue-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-150 flex-shrink-0';
                 copyButton.title = 'Copy code to clipboard';
                 
-                // SVG Icon (Copy)
+                
                 const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`;
-                // SVG Icon (Check)
+                
                 const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>`;
 
                 copyButton.innerHTML = copyIcon;
@@ -229,7 +228,7 @@
                     copyCodeToClipboard(friend.code, copyButton, copyIcon, checkIcon);
                 });
                 
-                // Assemble the parts
+                
                 codeWrapper.appendChild(codeElement);
                 codeWrapper.appendChild(copyButton);
                 
@@ -237,40 +236,40 @@
                 infoWrapper.appendChild(codeWrapper);
                 
                 listItem.appendChild(infoWrapper);
-                // The copy button is now inside the infoWrapper, so no need to append it separately
+                
                 
                 listContainer.appendChild(listItem);
             });
         }
         
-        // --- 9. Form Handling ---
+       
         
-        // Input Filtering: Username (Alphanumeric only)
+        
         usernameInput.addEventListener('input', function() {
             this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');
         });
 
-        // Input Filtering: Friend Code (Digits + Hyphens)
+        
         codeInput.addEventListener('input', function(e) {
-            let val = this.value.replace(/[^\d]/g, ''); // Remove non-digits
-            if (val.length > 12) val = val.substring(0, 12); // Max 12 digits
+            let val = this.value.replace(/[^\d]/g, ''); 
+            if (val.length > 12) val = val.substring(0, 12); 
             
-            // Corrected Hyphen Logic
-            const chunks = val.match(/.{1,4}/g); // Split into chunks of 4
+            
+            const chunks = val.match(/.{1,4}/g); 
             if (chunks) {
-                this.value = chunks.join('-'); // Join with hyphens
+                this.value = chunks.join('-'); 
             } else {
                 this.value = '';
             }
         });
         
-        // Search Input Filtering
+        
         searchInput.addEventListener('input', function() {
             currentSearchTerm = this.value.toLowerCase().trim();
-            updateHtmlList(); // Re-render the list on every keystroke
+            updateHtmlList(); 
         });
 
-        // Main Form Submission
+        
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!userId) {
@@ -282,7 +281,7 @@
             const codeRaw = codeInput.value.replace(/-/g, ''); // Store raw digits
             const color = colorInput.value;
 
-            // Validation
+            
             if (!username || !codeRaw || !color) {
                 showMessage("Please fill out all fields.", "error");
                 return;
@@ -295,8 +294,7 @@
             setFormDisabled(true); // Disable form
             
             try {
-                // --- Cooldown Check ---
-                // Private path for user metadata
+                
                 const userMetaPath = `artifacts/${appId}/users/${userId}/friend-code-meta/submission`;
                 const userMetaDoc = doc(db, userMetaPath);
                 const docSnap = await getDoc(userMetaDoc);
@@ -316,10 +314,9 @@
                     }
                 }
                 
-                // --- Proceed with Submission ---
-                // Public data path
+                
                 const collectionPath = `artifacts/${appId}/public/data/friend-codes`;
-                // Use the userId as the document ID to enforce one entry per user
+                
                 const docRef = doc(db, collectionPath, userId); 
 
                 await setDoc(docRef, {
@@ -330,26 +327,26 @@
                     authorId: userId
                 });
                 
-                // Update private cooldown timestamp
+                
                 await setDoc(userMetaDoc, {
                     lastSubmitted: serverTimestamp()
                 });
 
                 showMessage("Success! Your code is on the list.", "success");
                 form.reset(); // Clear form fields
-                codeInput.value = ''; // Ensure formatted field is cleared
+                codeInput.value = ''; 
                 
             } catch (error) {
                 console.error("Submission Error:", error);
                 showMessage("An error occurred. Please try again.", "error");
             } finally {
-                setFormDisabled(false); // Re-enable form
+                setFormDisabled(false); 
             }
         });
         
-        // --- 10. Helper Functions ---
         
-        // Show Success/Error Messages
+        
+        
         function showMessage(msg, type = "info") {
             messageArea.textContent = msg;
             messageArea.classList.remove('hidden', 'text-green-600', 'text-red-600', 'text-blue-600');
@@ -362,13 +359,13 @@
                 messageArea.classList.add('text-blue-600');
             }
             
-            // Hide message after 5 seconds
+            
             setTimeout(() => {
                 messageArea.classList.add('hidden');
             }, 5000);
         }
 
-        // Disable/Enable Form
+        
         function setFormDisabled(isDisabled) {
             submitButton.disabled = isDisabled;
             usernameInput.disabled = isDisabled;
@@ -384,11 +381,11 @@
             }
         }
         
-        // Copy to Clipboard
+        
         function copyCodeToClipboard(text, buttonEl, copyIcon, checkIcon) {
             const textarea = document.createElement('textarea');
             textarea.value = text;
-            textarea.style.position = 'fixed'; // Prevent screen jump
+            textarea.style.position = 'fixed'; 
             textarea.style.opacity = 0;
             document.body.appendChild(textarea);
             textarea.select();
@@ -397,7 +394,7 @@
                 document.execCommand('copy');
                 console.log('Code copied to clipboard:', text);
                 
-                // Visual feedback
+                
                 buttonEl.innerHTML = checkIcon;
                 setTimeout(() => {
                     buttonEl.innerHTML = copyIcon;
@@ -411,7 +408,7 @@
             document.body.removeChild(textarea);
         }
 
-        // --- 11. Start the App ---
+        
         initializeAppCore();
     </script>
 </head>
@@ -420,7 +417,7 @@
     <div class="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-6 sm:p-10">
         
         <div class="text-center mb-8">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Live Friend Code Hub</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Pembrokeshire Friends List</h1>
         </div>
 
         <div class="pb-2">
@@ -495,4 +492,5 @@
 
 </body>
 </html>
+
 
